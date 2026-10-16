@@ -21,6 +21,8 @@ else:
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tiktok_enterprise.db'
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# SQLite በባክግራውንድ ትሬድ (Background Thread) በሰላም ዳታ መጻፍ እንዲችል
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {"connect_args": {"check_same_thread": False}}
 
 db = SQLAlchemy(app)
 login_manager = LoginManager()
@@ -411,14 +413,15 @@ def run_tiktok_bot():
                     # IP ለማቀያየር ራንደም ፕሮክሲ መምረጥ
                     proxy_cfg = random.choice(proxies) if proxies else None
                     
-                    # ቦቱ እንዳይታወቅ በልዩ አርጉመንቶች (Native Stealth Args) መክፈት
+                    # ቦቱ እንዳይታወቅ በልዩ አርጉመንቶች (Native Stealth Args) እና memory flags መክፈት
                     browser = p.chromium.launch(
                         headless=True,
                         args=[
                             "--disable-blink-features=AutomationControlled",
                             "--disable-infobars",
                             "--no-sandbox",
-                            "--disable-setuid-sandbox"
+                            "--disable-setuid-sandbox",
+                            "--disable-dev-shm-usage"
                         ],
                         proxy=proxy_cfg
                     )
@@ -430,7 +433,12 @@ def run_tiktok_bot():
                     
                     status = 'Success'
                     try:
-                        page.goto(link.url, timeout=60000)
+                        # domcontentloaded በመጠቀም የጊዜ ገደብ (Timeout) ስህተትን እንከላከላለን
+                        page.goto(link.url, timeout=60000, wait_until='domcontentloaded')
+                        
+                        # ገጹ ከተከፈተ በኋላ ለትንሽ ሰከንድ ማረፊያ
+                        time.sleep(5)
+                        
                         # የሰው ልጅ የመዳሰሻ እንቅስቃሴዎችን (Human-like mouse movement & scrolling) ማስመሰል
                         page.mouse.move(random.randint(100, 400), random.randint(100, 400))
                         page.evaluate("window.scrollBy(0, 350)")
