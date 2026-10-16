@@ -386,10 +386,11 @@ def delete_user(id):
             db.session.commit()
     return redirect(url_for('index'))
 
-# --- አውቶሜሽን ቦት ማስጀመሪያ ከ Native Stealth እና Proxy Rotation ጋር ---
+# --- አውቶሜሽን ቦት ማስጀመሪያ ከ Like እና Comment Interaction ጋር ---
 def run_tiktok_bot():
     with app.app_context():
         accounts = Account.query.all()
+        comments = Comment.query.all()
         links = Link.query.all()
         settings = Setting.query.first()
         
@@ -399,7 +400,6 @@ def run_tiktok_bot():
         min_d = settings.min_delay if settings else 5
         max_d = settings.max_delay if settings else 12
         
-        # የፕሮክሲ ሊስት (Proxy List) - ማስተካከል ከፈለጉ እዚህ ይጨምሩ
         proxies = [
             # {"server": "http://your_proxy_ip:port", "username": "proxy_user", "password": "proxy_password"},
         ]
@@ -410,10 +410,8 @@ def run_tiktok_bot():
                     delay = random.randint(min_d, max_d)
                     time.sleep(delay)
                     
-                    # IP ለማቀያየር ራንደም ፕሮክሲ መምረጥ
                     proxy_cfg = random.choice(proxies) if proxies else None
                     
-                    # ቦቱ እንዳይታወቅ በልዩ አርጉመንቶች (Native Stealth Args) እና memory flags መክፈት
                     browser = p.chromium.launch(
                         headless=True,
                         args=[
@@ -427,24 +425,57 @@ def run_tiktok_bot():
                     )
                     
                     context = browser.new_context(
-                        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                        viewport={'width': 1280, 'height': 800}
                     )
                     page = context.new_page()
                     
                     status = 'Success'
+                    actions_taken = []
                     try:
-                        # domcontentloaded በመጠቀም የጊዜ ገደብ (Timeout) ስህተትን እንከላከላለን
+                        # ሊንኩን መክፈት
                         page.goto(link.url, timeout=60000, wait_until='domcontentloaded')
-                        
-                        # ገጹ ከተከፈተ በኋላ ለትንሽ ሰከንድ ማረፊያ
                         time.sleep(5)
                         
-                        # የሰው ልጅ የመዳሰሻ እንቅስቃሴዎችን (Human-like mouse movement & scrolling) ማስመሰል
+                        # የሰው ልጅ እንቅስቃሴዎችን ማስመሰል
                         page.mouse.move(random.randint(100, 400), random.randint(100, 400))
-                        page.evaluate("window.scrollBy(0, 350)")
-                        time.sleep(random.randint(3, 6))
+                        page.evaluate("window.scrollBy(0, 200)")
+                        time.sleep(2)
                         
-                        action_desc = f"Stealth Mode | Account: {acc.username} | Interacted Successfully"
+                        # 1. ላይክ ማድረግ (Like Action)
+                        try:
+                            like_button = page.locator('[data-e2e="like-icon"], span[class*="ButtonLike"]').first
+                            if like_button.is_visible(timeout=5000):
+                                like_button.click()
+                                actions_taken.append("Liked")
+                                time.sleep(2)
+                            else:
+                                actions_taken.append("Like button not visible")
+                        except Exception as e:
+                            actions_taken.append("Like skipped")
+                        
+                        # 2. ኮሜንት መጻፍ (Comment Action)
+                        if comments:
+                            chosen_comment = random.choice(comments).text
+                            try:
+                                comment_box = page.locator('[data-e2e="comment-input"], div[contenteditable="true"]').first
+                                if comment_box.is_visible(timeout=5000):
+                                    comment_box.click()
+                                    time.sleep(1)
+                                    comment_box.fill(chosen_comment)
+                                    time.sleep(1)
+                                    page.keyboard.press("Enter")
+                                    actions_taken.append(f"Commented: '{chosen_comment}'")
+                                    time.sleep(3)
+                                else:
+                                    actions_taken.append("Comment box not visible")
+                            except Exception as e:
+                                actions_taken.append("Comment skipped")
+                        else:
+                            actions_taken.append("No comments in pool")
+                        
+                        action_desc = f"Stealth | Acc: {acc.username} | Actions: {', '.join(actions_taken)}"
+                    
                     except Exception as e:
                         action_desc = f"Failed for {acc.username}: {str(e)}"
                         status = 'Failed'
