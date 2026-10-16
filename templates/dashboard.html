@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+    <meta charset="UTF-8">
+    <title>Enterprise TikTok Operations Portal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-main: #f8fafc;
+            --text-main: #1e293b;
+            --card-bg: #ffffff;
+            --border-color: #e2e8f0;
+            --primary-color: #0f172a;
+            --accent-blue: #2563eb;
+        }
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-size: 0.92rem;
+            line-height: 1.5;
+        }
+        .navbar-enterprise {
+            background-color: var(--primary-color);
+            border-bottom: 1px solid #334155;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .enterprise-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+            transition: box-shadow 0.2s ease;
+        }
+        .enterprise-card:hover {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+        .form-control, .form-select {
+            border-color: var(--border-color);
+            font-size: 0.88rem;
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+        }
+        .form-control:focus, .form-select:focus {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+        .btn-enterprise {
+            background-color: var(--primary-color);
+            color: #fff;
+            font-weight: 500;
+            font-size: 0.88rem;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            border: none;
+        }
+        .btn-enterprise:hover {
+            background-color: #1e293b;
+            color: #fff;
+        }
+        .table {
+            font-size: 0.875rem;
+            margin-bottom: 0;
+        }
+        .table thead th {
+            background-color: #f1f5f9;
+            color: #475569;
+            font-weight: 600;
+            border-bottom: 2px solid var(--border-color);
+            padding: 0.65rem;
+        }
+        .table td {
+            padding: 0.65rem;
+            vertical-align: middle;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #10b981;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+        }
+        .lang-switch {
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-decoration: none;
+            padding: 4px 10px;
+            border-radius: 4px;
+            border: 1px solid #475569;
+            color: #cbd5e1;
+        }
+        .lang-switch.active {
+            background-color: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: #fff;
+        }
+        .instruction-box {
+            background-color: #f8fafc;
+            border-left: 4px solid var(--accent-blue);
+            border: 1px solid var(--border-color);
+            border-left-width: 4px;
+            border-radius: 8px;
+        }
+        .table-container {
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            overflow: hidden;
+            background: #fff;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-enterprise px-4 py-3">
+        <div class="container-fluid">
+            <a class="navbar-brand text-white fw-bold fs-6 d-flex align-items-center" href="#">
+                <i class="fa-solid fa-shield-halved text-info me-2 fs-5"></i> {{ t.title }}
+            </a>
+            <div class="d-flex align-items-center gap-3">
+                <div class="d-flex align-items-center gap-1">
+                    <a href="/set_language/am" class="lang-switch {% if lang == 'am' %}active{% endif %}">አማርኛ</a>
+                    <a href="/set_language/en" class="lang-switch {% if lang == 'en' %}active{% endif %}">English</a>
+                </div>
+                <div class="text-white-50 small border-start border-secondary ps-3">
+                    <span class="status-dot"></span> {{ t.live_status }}
+                </div>
+                <div class="text-end border-start border-secondary ps-3">
+                    <span class="d-block small text-white-50">{{ t.user }}: <strong class="text-white">{{ current_user.username }}</strong></span>
+                    <span class="badge bg-secondary text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.5px;">{{ current_user.role }}</span>
+                </div>
+                <a href="/logout" class="btn btn-outline-light btn-sm px-3 ms-2"><i class="fa-solid fa-arrow-right-from-bracket me-1"></i> {{ t.logout }}</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container my-4">
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div class="alert alert-primary alert-dismissible fade show enterprise-card mb-4 py-2 small border-0 shadow-sm" role="alert">
+                <i class="fa-solid fa-circle-info me-1 text-primary"></i> {{ messages[0] }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        <!-- INSTRUCTIONS BOX -->
+        <div class="row mb-4">
+            <div class="col-lg-12">
+                <div class="enterprise-card p-3 instruction-box">
+                    <h6 class="fw-bold text-dark mb-2"><i class="fa-solid fa-circle-question text-primary me-2"></i> {{ t.instructions_title }}</h6>
+                    <ul class="mb-0 ps-3 text-muted small">
+                        <li class="mb-1">{{ t.inst_1|safe }}</li>
+                        <li class="mb-1">{{ t.inst_2|safe }}</li>
+                        <li>{{ t.inst_3|safe }}</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- SETTINGS WITH ANTI-DETECTION DELAYS & COUNTS -->
+        <div class="row mb-4">
+            <div class="col-lg-12">
+                <div class="enterprise-card p-4">
+                    <h6 class="fw-bold mb-3 text-dark"><i class="fa-solid fa-sliders text-primary me-2"></i> {{ t.settings }}</h6>
+                    <form action="/update_settings" method="POST" class="row g-3 align-items-end">
+                        <div class="col-md-2">
+                            <label class="form-label small text-muted fw-semibold">{{ t.likes }}</label>
+                            <input type="number" name="likes_count" value="{{ settings.likes_count if settings else 1 }}" class="form-control" min="1" {% if current_user.role == 'viewer' %}disabled{% endif %}>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small text-muted fw-semibold">{{ t.follows }}</label>
+                            <input type="number" name="follows_count" value="{{ settings.follows_count if settings else 1 }}" class="form-control" min="0" {% if current_user.role == 'viewer' %}disabled{% endif %}>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small text-muted fw-semibold">{{ t.comments }}</label>
+                            <input type="number" name="comments_count" value="{{ settings.comments_count if settings else 1 }}" class="form-control" min="1" {% if current_user.role == 'viewer' %}disabled{% endif %}>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small text-muted fw-semibold">{{ t.min_delay }}</label>
+                            <input type="number" name="min_delay" value="{{ settings.min_delay if settings else 5 }}" class="form-control" min="1" {% if current_user.role == 'viewer' %}disabled{% endif %}>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small text-muted fw-semibold">{{ t.max_delay }}</label>
+                            <input type="number" name="max_delay" value="{{ settings.max_delay if settings else 12 }}" class="form-control" min="1" {% if current_user.role == 'viewer' %}disabled{% endif %}>
+                        </div>
+                        <div class="col-md-2">
+                            {% if current_user.role != 'viewer' %}
+                            <button type="submit" class="btn btn-enterprise w-100"><i class="fa-solid fa-floppy-disk me-1"></i> {{ t.save_settings }}</button>
+                            {% endif %}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4 mb-4">
+            <!-- ACCOUNTS -->
+            <div class="col-lg-4">
+                <div class="enterprise-card p-4 h-100 d-flex flex-column">
+                    <h6 class="fw-bold mb-3 text-dark"><i class="fa-solid fa-users text-primary me-2"></i> {{ t.accounts }}</h6>
+                    {% if current_user.role != 'viewer' %}
+                    <form action="/upload_accounts" method="POST" enctype="multipart/form-data" class="mb-3">
+                        <div class="input-group input-group-sm mb-1">
+                            <input type="file" name="account_file" class="form-control" accept=".xlsx" required>
+                            <button type="submit" class="btn btn-enterprise">{{ t.upload }}</button>
+                        </div>
+                        <small class="text-muted" style="font-size: 0.75rem;">Excel columns: `username`, `password`</small>
+                    </form>
+                    <hr class="text-muted my-2">
+                    {% endif %}
+                    <div class="table-container flex-grow-1" style="max-height: 220px; overflow-y: auto;">
+                        <table class="table align-middle">
+                            <tbody>
+                                {% for acc in accounts %}
+                                <tr>
+                                    <td><i class="fa-regular fa-user text-muted me-1"></i> {{ acc.username }}</td>
+                                    <td class="text-end">
+                                        {% if current_user.role != 'viewer' %}
+                                        <a href="/delete/account/{{ acc.id }}" class="text-danger" title="Delete"><i class="fa-solid fa-trash-can"></i></a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="2" class="text-center text-muted small py-4">No accounts loaded</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- COMMENTS -->
+            <div class="col-lg-4">
+                <div class="enterprise-card p-4 h-100 d-flex flex-column">
+                    <h6 class="fw-bold mb-3 text-dark"><i class="fa-solid fa-comments text-success me-2"></i> {{ t.comment_pool }}</h6>
+                    {% if current_user.role != 'viewer' %}
+                    <form action="/upload_comments" method="POST" enctype="multipart/form-data" class="mb-3">
+                        <div class="input-group input-group-sm mb-1">
+                            <input type="file" name="comment_file" class="form-control" accept=".docx, .xlsx" required>
+                            <button type="submit" class="btn btn-enterprise">{{ t.distribute }}</button>
+                        </div>
+                        <small class="text-muted" style="font-size: 0.75rem;">Word (.docx) or Excel distributed</small>
+                    </form>
+                    <hr class="text-muted my-2">
+                    {% endif %}
+                    <div class="table-container flex-grow-1" style="max-height: 220px; overflow-y: auto;">
+                        <table class="table align-middle">
+                            <tbody>
+                                {% for c in comments %}
+                                <tr>
+                                    <td class="text-truncate" style="max-width: 180px;" title="{{ c.text }}">{{ c.text }}</td>
+                                    <td class="text-end">
+                                        {% if current_user.role != 'viewer' %}
+                                        <a href="/delete/comment/{{ c.id }}" class="text-danger" title="Delete"><i class="fa-solid fa-trash-can"></i></a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="2" class="text-center text-muted small py-4">No comments loaded</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LINKS & RUN -->
+            <div class="col-lg-4">
+                <div class="enterprise-card p-4 h-100 d-flex flex-column">
+                    <h6 class="fw-bold mb-3 text-dark"><i class="fa-solid fa-link text-warning me-2"></i> {{ t.target_links }}</h6>
+                    {% if current_user.role != 'viewer' %}
+                    <form action="/add_link" method="POST" class="mb-3">
+                        <div class="input-group input-group-sm mb-1">
+                            <input type="text" name="post_url" class="form-control" placeholder="https://tiktok.com/@user/video/..." required>
+                            <button type="submit" class="btn btn-enterprise">{{ t.add_link }}</button>
+                        </div>
+                    </form>
+                    <hr class="text-muted my-2">
+                    {% endif %}
+                    <div class="table-container mb-3 flex-grow-1" style="max-height: 120px; overflow-y: auto;">
+                        <table class="table align-middle">
+                            <tbody>
+                                {% for l in links %}
+                                <tr>
+                                    <td class="text-truncate" style="max-width: 180px;"><a href="{{ l.url }}" target="_blank" class="text-decoration-none text-dark">{{ l.url }}</a></td>
+                                    <td class="text-end">
+                                        {% if current_user.role != 'viewer' %}
+                                        <a href="/delete/link/{{ l.id }}" class="text-danger" title="Delete"><i class="fa-solid fa-trash-can"></i></a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="2" class="text-center text-muted small py-3">No links loaded</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% if current_user.role != 'viewer' %}
+                    <form action="/start_automation" method="POST" class="mt-auto">
+                        <button type="submit" class="btn btn-enterprise w-100 py-2"><i class="fa-solid fa-play text-success me-1"></i> {{ t.start_bot }}</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {% if current_user.role == 'admin' %}
+        <!-- ADMIN USER MANAGEMENT -->
+        <div class="row mb-4">
+            <div class="col-lg-12">
+                <div class="enterprise-card p-4">
+                    <h6 class="fw-bold mb-3 text-dark"><i class="fa-solid fa-user-shield text-danger me-2"></i> {{ t.admin_mgmt }}</h6>
+                    <form action="/add_user" method="POST" class="row g-3 mb-4 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted fw-semibold">Username</label>
+                            <input type="text" name="new_username" class="form-control form-control-sm" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted fw-semibold">Password</label>
+                            <input type="password" name="new_password" class="form-control form-control-sm" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted fw-semibold">Role</label>
+                            <select name="new_role" class="form-select form-select-sm">
+                                <option value="admin">Admin</option>
+                                <option value="operator">Operator</option>
+                                <option value="viewer">Viewer</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <button type="submit" class="btn btn-enterprise btn-sm w-100"><i class="fa-solid fa-user-plus me-1"></i> {{ t.add_user }}</button>
+                        </div>
+                    </form>
+                    <div class="table-container" style="max-height: 200px; overflow-y: auto;">
+                        <table class="table align-middle">
+                            <thead>
+                                <tr><th>Username</th><th>Role</th><th>Change Role</th><th class="text-end">Action</th></tr>
+                            </thead>
+                            <tbody>
+                                {% for u in users %}
+                                <tr>
+                                    <td><i class="fa-solid fa-user text-muted me-1"></i> {{ u.username }}</td>
+                                    <td><span class="badge bg-light text-dark border">{{ u.role }}</span></td>
+                                    <td>
+                                        <form action="/update_user_role/{{ u.id }}" method="POST" class="d-flex gap-2">
+                                            <select name="role" class="form-select form-select-sm" style="width: 110px;">
+                                                <option value="admin" {% if u.role == 'admin' %}selected{% endif %}>Admin</option>
+                                                <option value="operator" {% if u.role == 'operator' %}selected{% endif %}>Operator</option>
+                                                <option value="viewer" {% if u.role == 'viewer' %}selected{% endif %}>Viewer</option>
+                                            </select>
+                                            <button type="submit" class="btn btn-sm btn-outline-secondary py-0">Update</button>
+                                        </form>
+                                    </td>
+                                    <td class="text-end">
+                                        {% if u.id != current_user.id %}
+                                        <a href="/delete_user/{{ u.id }}" class="text-danger" title="Delete"><i class="fa-solid fa-trash-can"></i></a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- AUDIT & EXECUTION REPORTS -->
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="enterprise-card p-4">
+                    <h6 class="fw-bold mb-3 text-dark"><i class="fa-solid fa-clipboard-list text-secondary me-2"></i> {{ t.reports }}</h6>
+                    <div class="table-container" style="max-height: 280px; overflow-y: auto;">
+                        <table class="table align-middle">
+                            <thead>
+                                <tr><th>{{ t.time }}</th><th>{{ t.account }}</th><th>{{ t.link }}</th><th>{{ t.action }}</th><th>{{ t.status }}</th></tr>
+                            </thead>
+                            <tbody>
+                                {% for r in reports %}
+                                <tr>
+                                    <td class="text-muted small">{{ r.timestamp }}</td>
+                                    <td><strong>{{ r.account_used }}</strong></td>
+                                    <td class="text-truncate" style="max-width: 200px;"><a href="{{ r.target_link }}" target="_blank" class="text-decoration-none text-secondary">{{ r.target_link }}</a></td>
+                                    <td>{{ r.action_performed }}</td>
+                                    <td><span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">{{ r.status }}</span></td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="5" class="text-center text-muted small py-4">No execution records found. Launch bot to generate logs.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
