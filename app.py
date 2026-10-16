@@ -9,7 +9,6 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from playwright.sync_api import sync_playwright
-from playwright_stealth import stealth_sync
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-super-secret-key-change-this'
@@ -352,13 +351,12 @@ def delete_user(id):
             db.session.commit()
     return redirect(url_for('index'))
 
-# --- አውቶሜሽን ቦት ማስጀመሪያ ከ Stealth እና IP (Proxy) Rotation ጋር ---
+# --- አውቶሜሽን ቦት ማስጀመሪያ ከ Native Stealth እና Proxy Rotation ጋር ---
 def run_tiktok_bot():
     with app.app_context():
         accounts = Account.query.all()
         links = Link.query.all()
         settings = Setting.query.first()
-        comments = Comment.query.all()
         
         if not accounts or not links:
             return
@@ -379,16 +377,23 @@ def run_tiktok_bot():
                     
                     # IP ለማቀያየር ራንደም ፕሮክሲ መምረጥ
                     proxy_cfg = random.choice(proxies) if proxies else None
-                    launch_args = {"headless": True, "proxy": proxy_cfg} if proxy_cfg else {"headless": True}
                     
-                    browser = p.chromium.launch(**launch_args)
+                    # ቦቱ እንዳይታወቅ በልዩ አርጉመንቶች (Native Stealth Args) መክፈት
+                    browser = p.chromium.launch(
+                        headless=True,
+                        args=[
+                            "--disable-blink-features=AutomationControlled",
+                            "--disable-infobars",
+                            "--no-sandbox",
+                            "--disable-setuid-sandbox"
+                        ],
+                        proxy=proxy_cfg
+                    )
+                    
                     context = browser.new_context(
                         user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
                     )
                     page = context.new_page()
-                    
-                    # የቦት ማንነት እንዳይገለጥ (Stealth Mode) ሙሉ በሙሉ መደበቅ
-                    stealth_sync(page)
                     
                     status = 'Success'
                     try:
