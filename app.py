@@ -386,7 +386,7 @@ def delete_user(id):
             db.session.commit()
     return redirect(url_for('index'))
 
-# --- አውቶሜሽን ቦት ማስጀመሪያ ከ Like እና Comment Interaction ጋር ---
+# --- አውቶሜሽን ቦት ማስጀመሪያ ከተሻሻለ መስተጋብር (Like & Comment) ጋር ---
 def run_tiktok_bot():
     with app.app_context():
         accounts = Account.query.all()
@@ -425,42 +425,58 @@ def run_tiktok_bot():
                     )
                     
                     context = browser.new_context(
-                        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                        viewport={'width': 1280, 'height': 800}
+                        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+                        viewport={'width': 1366, 'height': 768}
                     )
                     page = context.new_page()
                     
                     status = 'Success'
                     actions_taken = []
                     try:
-                        # ሊንኩን መክፈት
+                        # 1. ሊንኩን መክፈት
                         page.goto(link.url, timeout=60000, wait_until='domcontentloaded')
-                        time.sleep(5)
+                        time.sleep(6)
                         
-                        # የሰው ልጅ እንቅስቃሴዎችን ማስመሰል
-                        page.mouse.move(random.randint(100, 400), random.randint(100, 400))
-                        page.evaluate("window.scrollBy(0, 200)")
-                        time.sleep(2)
-                        
-                        # 1. ላይክ ማድረግ (Like Action)
+                        # 2. ብቅ ባይ መልዕክቶችን (Pop-ups) መዝጋት
                         try:
-                            like_button = page.locator('[data-e2e="like-icon"], span[class*="ButtonLike"]').first
+                            close_btn = page.locator('button[aria-label="Close"], div[class*="ButtonClose"], [data-e2e="modal-close-inner"]').first
+                            if close_btn.is_visible(timeout=3000):
+                                close_btn.click()
+                                time.sleep(1)
+                        except Exception:
+                            pass
+
+                        # 3. የሰው ልጅ እንቅስቃሴዎችን ማስመሰል
+                        page.mouse.move(random.randint(100, 500), random.randint(100, 500))
+                        page.evaluate("window.scrollBy(0, 300)")
+                        time.sleep(3)
+                        
+                        # 4. ላይክ ማድረግ (Enhanced Like Selector)
+                        try:
+                            like_selector = '[data-e2e="browse-like-icon"], [data-e2e="like-icon"], span[class*="SpanLikeIcon"], button[class*="ButtonLike"]'
+                            like_button = page.locator(like_selector).first
+                            
                             if like_button.is_visible(timeout=5000):
-                                like_button.click()
+                                like_button.scroll_into_view_if_needed()
+                                time.sleep(1)
+                                like_button.click(force=True)
                                 actions_taken.append("Liked")
                                 time.sleep(2)
                             else:
                                 actions_taken.append("Like button not visible")
-                        except Exception as e:
+                        except Exception:
                             actions_taken.append("Like skipped")
                         
-                        # 2. ኮሜንት መጻፍ (Comment Action)
+                        # 5. ኮሜንት መጻፍ (Enhanced Comment Selector)
                         if comments:
                             chosen_comment = random.choice(comments).text
                             try:
-                                comment_box = page.locator('[data-e2e="comment-input"], div[contenteditable="true"]').first
+                                comment_selector = '[data-e2e="comment-input"], div[contenteditable="true"], textarea[placeholder*="comment"]'
+                                comment_box = page.locator(comment_selector).first
+                                
                                 if comment_box.is_visible(timeout=5000):
-                                    comment_box.click()
+                                    comment_box.scroll_into_view_if_needed()
+                                    comment_box.click(force=True)
                                     time.sleep(1)
                                     comment_box.fill(chosen_comment)
                                     time.sleep(1)
@@ -469,10 +485,10 @@ def run_tiktok_bot():
                                     time.sleep(3)
                                 else:
                                     actions_taken.append("Comment box not visible")
-                            except Exception as e:
+                            except Exception:
                                 actions_taken.append("Comment skipped")
                         else:
-                            actions_taken.append("No comments in pool")
+                            actions_taken.append("No comments available")
                         
                         action_desc = f"Stealth | Acc: {acc.username} | Actions: {', '.join(actions_taken)}"
                     
