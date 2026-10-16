@@ -128,6 +128,17 @@ class Report(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
+# --- አፕሊኬሽኑ ሲነሳ ዳታቤዝ እና አድሚን ዩዘር በራስሰር እንዲፈጠር ማድረግ (Render Compatibility) ---
+with app.app_context():
+    db.create_all()
+    if not User.query.filter_by(username='admin').first():
+        hashed_pw = generate_password_hash('admin123')
+        db.session.add(User(username='admin', password=hashed_pw, role='admin'))
+        db.session.commit()
+    if not Setting.query.first():
+        db.session.add(Setting())
+        db.session.commit()
+
 # --- ራውቶች (Routes) ---
 @app.route('/')
 @login_required
@@ -162,14 +173,7 @@ def login():
             login_user(user)
             return redirect(url_for('index'))
         flash('የተሳሳተ መግቢያ ስም ወይም የይለፍ ቃል!')
-    return '''
-        <h2>Login</h2>
-        <form method="POST">
-            Username: <input type="text" name="username"><br>
-            Password: <input type="password" name="password"><br>
-            <input type="submit" value="Login">
-        </form>
-    '''
+    return render_template('login.html')
 
 @app.route('/logout')
 @login_required
@@ -306,7 +310,7 @@ def delete_user(id):
             db.session.commit()
     return redirect(url_for('index'))
 
-# --- እውነተኛው የቲክቶክ አውቶሜሽን ቦት ሎጂክ (Playwright Browser Automation) ---
+# --- አውቶሜሽን ቦት ማስጀመሪያ ሎጂክ (Playwright Browser Automation) ---
 def run_tiktok_bot():
     with app.app_context():
         accounts = Account.query.all()
@@ -320,26 +324,20 @@ def run_tiktok_bot():
         min_d = settings.min_delay if settings else 5
         max_d = settings.max_delay if settings else 12
         
-        # Playwright ተጠቅሞ ብራውዘር ማስጀመር
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True) # በ Render ላይ እንዲሠራ headless=True መሆን አለበት
+            browser = p.chromium.launch(headless=True)
             context = browser.new_context()
             
             for link in links:
                 for acc in accounts:
                     delay = random.randint(min_d, max_d)
-                    time.sleep(delay) # የፀጥታ እና Anti-detection መዘግየት
+                    time.sleep(delay)
                     
                     page = context.new_page()
                     status = 'Success'
                     try:
-                        # ወደ የታለመደው የቲክቶክ ሊንክ መሄድ
                         page.goto(link.url, timeout=60000)
                         time.sleep(4)
-                        
-                        # እዚህ ጋር ላይክ ወይም ኮሜንት የሚደረጉበት ኤለመንቶች ክሊክ ይደረጋሉ
-                        # (ምሳሌ፦ page.locator("button[data-e2e='like-icon']").click())
-                        
                         action_desc = f"Account: {acc.username} | Visited & Interacted (Delay: {delay}s)"
                     except Exception as e:
                         action_desc = f"Failed for {acc.username}: {str(e)}"
@@ -347,7 +345,6 @@ def run_tiktok_bot():
                     finally:
                         page.close()
                     
-                    # ሪፖርት ዳታቤዝ ላይ መመዝገብ
                     report = Report(
                         timestamp=time.strftime('%Y-%m-%d %H:%M:%S'),
                         account_used=acc.username,
@@ -374,16 +371,5 @@ def start_automation():
     return redirect(url_for('index'))
 
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-        if not User.query.filter_by(username='admin').first():
-            hashed_pw = generate_password_hash('admin123')
-            db.session.add(User(username='admin', password=hashed_pw, role='admin'))
-            db.session.commit()
-            
-        if not Setting.query.first():
-            db.session.add(Setting())
-            db.session.commit()
-            
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
