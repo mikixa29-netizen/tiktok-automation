@@ -4,7 +4,7 @@ import time
 import random
 import pandas as pd
 from docx import Document
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, render_template_string, request, redirect, url_for, flash, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -12,7 +12,13 @@ from playwright.sync_api import sync_playwright
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-super-secret-key-change-this'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tiktok_enterprise.db'
+
+# Render ላይ ሲሰራ ዳታቤዙን ወደ /tmp ፎልደር እንዲያደርገው (Read-only ችግር እንዳይፈጠር)
+if 'RENDER' in os.environ:
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////tmp/tiktok_enterprise.db'
+else:
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tiktok_enterprise.db'
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -128,16 +134,19 @@ class Report(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# --- አፕሊኬሽኑ ሲነሳ ዳታቤዝ እና አድሚን ዩዘር በራስሰር እንዲፈጠር ማድረግ (Render Compatibility) ---
-with app.app_context():
-    db.create_all()
-    if not User.query.filter_by(username='admin').first():
-        hashed_pw = generate_password_hash('admin123')
-        db.session.add(User(username='admin', password=hashed_pw, role='admin'))
-        db.session.commit()
-    if not Setting.query.first():
-        db.session.add(Setting())
-        db.session.commit()
+# --- አፕሊኬሽኑ ሲነሳ ዳታቤዙን እና ነባሪ አድሚን በራስሰር መፍጠር ---
+def init_db():
+    with app.app_context():
+        db.create_all()
+        if not User.query.filter_by(username='admin').first():
+            hashed_pw = generate_password_hash('admin123')
+            db.session.add(User(username='admin', password=hashed_pw, role='admin'))
+            db.session.commit()
+        if not Setting.query.first():
+            db.session.add(Setting())
+            db.session.commit()
+
+init_db()
 
 # --- ራውቶች (Routes) ---
 @app.route('/')
@@ -163,6 +172,38 @@ def set_language(lang_code):
         session['lang'] = lang_code
     return redirect(url_for('index'))
 
+LOGIN_HTML = '''
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login - Enterprise TikTok Portal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light d-flex align-items-center justify-content-center vh-100">
+    <div class="card shadow p-4" style="width: 380px; border-radius: 10px;">
+        <h4 class="text-center mb-4 fw-bold text-dark">TikTok Portal Login</h4>
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div class="alert alert-danger py-2 small">{{ messages[0] }}</div>
+          {% endif %}
+        {% endwith %}
+        <form method="POST">
+            <div class="mb-3">
+                <label class="form-label small fw-semibold text-muted">Username</label>
+                <input type="text" name="username" class="form-control" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label small fw-semibold text-muted">Password</label>
+                <input type="password" name="password" class="form-control" required>
+            </div>
+            <button type="submit" class="btn btn-dark w-100 py-2">Login</button>
+        </form>
+    </div>
+</body>
+</html>
+'''
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -173,7 +214,7 @@ def login():
             login_user(user)
             return redirect(url_for('index'))
         flash('የተሳሳተ መግቢያ ስም ወይም የይለፍ ቃል!')
-    return render_template('login.html')
+    return render_template_string(LOGIN_HTML)
 
 @app.route('/logout')
 @login_required
@@ -310,7 +351,7 @@ def delete_user(id):
             db.session.commit()
     return redirect(url_for('index'))
 
-# --- አውቶሜሽን ቦት ማስጀመሪያ ሎጂክ (Playwright Browser Automation) ---
+# --- አውቶሜሽን ቦት ማስጀመሪያ ሎጂክ (Playwright) ---
 def run_tiktok_bot():
     with app.app_context():
         accounts = Account.query.all()
