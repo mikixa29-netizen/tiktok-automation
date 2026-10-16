@@ -2,6 +2,7 @@ import os
 import threading
 import time
 import random
+import io
 import pandas as pd
 from docx import Document
 from flask import Flask, render_template, render_template_string, request, redirect, url_for, flash, session
@@ -253,12 +254,23 @@ def upload_accounts():
     
     file = request.files.get('account_file')
     if file:
-        df = pd.read_excel(file)
-        for _, row in df.iterrows():
-            acc = Account(username=str(row['username']), password=str(row['password']))
-            db.session.add(acc)
-        db.session.commit()
-        flash('አካውንቶች በተሳካ ሁኔታ ተጭነዋል!')
+        try:
+            file_stream = io.BytesIO(file.read())
+            df = pd.read_excel(file_stream, engine='openpyxl')
+            df.columns = df.columns.astype(str).str.strip().str.lower()
+            if 'username' in df.columns and 'password' in df.columns:
+                for _, row in df.iterrows():
+                    uname = str(row['username']).strip()
+                    pasw = str(row['password']).strip()
+                    if uname and uname != 'nan':
+                        db.session.add(Account(username=uname, password=pasw))
+                db.session.commit()
+                flash('አካውንቶች በተሳካ ሁኔታ ተጭነዋል!')
+            else:
+                flash('ስህተት፡ Excel ፋይሉ ላይ `username` እና `password` የሚሉ ኮለሞች መኖር አለባቸው!')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'ፋይሉን ማንበብ አልተቻለም፡ {str(e)}')
     return redirect(url_for('index'))
 
 @app.route('/upload_comments', methods=['GET', 'POST'])
@@ -271,19 +283,30 @@ def upload_comments():
     
     file = request.files.get('comment_file')
     if file:
-        filename = file.filename
-        if filename.endswith('.docx'):
-            doc = Document(file)
-            for para in doc.paragraphs:
-                if para.text.strip():
-                    db.session.add(Comment(text=para.text.strip()))
-        elif filename.endswith('.xlsx'):
-            df = pd.read_excel(file)
-            for col in df.columns:
-                for val in df[col].dropna():
-                    db.session.add(Comment(text=str(val)))
-        db.session.commit()
-        flash('ኮሜንቶች በተሳካ ሁኔታ ተጭነዋል!')
+        try:
+            filename = file.filename.lower()
+            file_stream = io.BytesIO(file.read())
+            if filename.endswith('.docx'):
+                doc = Document(file_stream)
+                for para in doc.paragraphs:
+                    if para.text.strip():
+                        db.session.add(Comment(text=para.text.strip()))
+                db.session.commit()
+                flash('ኮሜንቶች በተሳካ ሁኔታ ተጭነዋል!')
+            elif filename.endswith('.xlsx'):
+                df = pd.read_excel(file_stream, engine='openpyxl')
+                for col in df.columns:
+                    for val in df[col].dropna():
+                        val_str = str(val).strip()
+                        if val_str and val_str != 'nan':
+                            db.session.add(Comment(text=val_str))
+                db.session.commit()
+                flash('ኮሜንቶች በተሳካ ሁኔታ ተጭነዋል!')
+            else:
+                flash('ስህተት፡ እባክዎን የ .xlsx ወይም .docx ፋይል ይጫኑ!')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'ፋይሉን ማንበብ አልተቻለም፡ {str(e)}')
     return redirect(url_for('index'))
 
 @app.route('/add_link', methods=['GET', 'POST'])
@@ -296,9 +319,13 @@ def add_link():
     
     url = request.form.get('post_url')
     if url:
-        db.session.add(Link(url=url))
-        db.session.commit()
-        flash('ሊንክ ተጨምሯል!')
+        try:
+            db.session.add(Link(url=url.strip()))
+            db.session.commit()
+            flash('ሊንክ ተጨምሯል!')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'ሊንኩን መመዝገብ አልተቻለም፡ {str(e)}')
     return redirect(url_for('index'))
 
 @app.route('/delete/account/<int:id>')
