@@ -9,6 +9,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from playwright.sync_api import sync_playwright
+from playwright_stealth import stealth_sync
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-super-secret-key-change-this'
@@ -50,7 +51,7 @@ TRANSLATIONS = {
         'distribute': 'Distribute',
         'target_links': 'Target Links',
         'add_link': 'Add Link',
-        'start_bot': 'Launch Automation Bot',
+        'start_bot': 'Launch Stealth Automation',
         'admin_mgmt': 'Admin User & Role Management',
         'add_user': 'Add User',
         'reports': 'Execution Audit & Reports',
@@ -82,7 +83,7 @@ TRANSLATIONS = {
         'distribute': 'አሰራጭ',
         'target_links': 'የታለመዱ ሊንኮች',
         'add_link': 'ሊንክ ጨምር',
-        'start_bot': 'ቦቱን አስጀምር',
+        'start_bot': 'ቦቱን በድብቅ (Stealth) አስጀምር',
         'admin_mgmt': 'የአስተዳዳሪ እና የዩዘር አስተዳደር',
         'add_user': 'ዩዘር ጨምር',
         'reports': 'የክንውን ሪፖርቶች እና ታሪክ',
@@ -351,7 +352,7 @@ def delete_user(id):
             db.session.commit()
     return redirect(url_for('index'))
 
-# --- አውቶሜሽን ቦት ማስጀመሪያ ሎጂክ (Playwright) ---
+# --- አውቶሜሽን ቦት ማስጀመሪያ ከ Stealth እና IP (Proxy) Rotation ጋር ---
 def run_tiktok_bot():
     with app.app_context():
         accounts = Account.query.all()
@@ -365,26 +366,44 @@ def run_tiktok_bot():
         min_d = settings.min_delay if settings else 5
         max_d = settings.max_delay if settings else 12
         
+        # የፕሮክሲ ሊስት (Proxy List) - ማስተካከል ከፈለጉ እዚህ ይጨምሩ
+        proxies = [
+            # {"server": "http://your_proxy_ip:port", "username": "proxy_user", "password": "proxy_password"},
+        ]
+        
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            context = browser.new_context()
-            
             for link in links:
                 for acc in accounts:
                     delay = random.randint(min_d, max_d)
                     time.sleep(delay)
                     
+                    # IP ለማቀያየር ራንደም ፕሮክሲ መምረጥ
+                    proxy_cfg = random.choice(proxies) if proxies else None
+                    launch_args = {"headless": True, "proxy": proxy_cfg} if proxy_cfg else {"headless": True}
+                    
+                    browser = p.chromium.launch(**launch_args)
+                    context = browser.new_context(
+                        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                    )
                     page = context.new_page()
+                    
+                    # የቦት ማንነት እንዳይገለጥ (Stealth Mode) ሙሉ በሙሉ መደበቅ
+                    stealth_sync(page)
+                    
                     status = 'Success'
                     try:
                         page.goto(link.url, timeout=60000)
-                        time.sleep(4)
-                        action_desc = f"Account: {acc.username} | Visited & Interacted (Delay: {delay}s)"
+                        # የሰው ልጅ የመዳሰሻ እንቅስቃሴዎችን (Human-like mouse movement & scrolling) ማስመሰል
+                        page.mouse.move(random.randint(100, 400), random.randint(100, 400))
+                        page.evaluate("window.scrollBy(0, 350)")
+                        time.sleep(random.randint(3, 6))
+                        
+                        action_desc = f"Stealth Mode | Account: {acc.username} | Interacted Successfully"
                     except Exception as e:
                         action_desc = f"Failed for {acc.username}: {str(e)}"
                         status = 'Failed'
                     finally:
-                        page.close()
+                        browser.close()
                     
                     report = Report(
                         timestamp=time.strftime('%Y-%m-%d %H:%M:%S'),
@@ -395,8 +414,6 @@ def run_tiktok_bot():
                     )
                     db.session.add(report)
                     db.session.commit()
-            
-            browser.close()
 
 @app.route('/start_automation', methods=['POST'])
 @login_required
@@ -408,7 +425,7 @@ def start_automation():
     thread.daemon = True
     thread.start()
     
-    flash('ቲክቶክ አውቶሜሽን ቦቱ በጀርባ (Background) መሥራት ጀምሯል!')
+    flash('ቲክቶክ ስቴልዝ አውቶሜሽን ቦቱ በደህንነትና በአይፒ ሮቴሽን መሥራት ጀምሯል!')
     return redirect(url_for('index'))
 
 if __name__ == '__main__':
