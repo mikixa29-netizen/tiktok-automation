@@ -243,9 +243,11 @@ def update_settings():
     flash('ቅንብሮችዎ በተሳካ ሁኔታ ተዘምነዋል!')
     return redirect(url_for('index'))
 
-@app.route('/upload_accounts', methods=['POST'])
+@app.route('/upload_accounts', methods=['GET', 'POST'])
 @login_required
 def upload_accounts():
+    if request.method == 'GET':
+        return redirect(url_for('index'))
     if current_user.role == 'viewer':
         return redirect(url_for('index'))
     
@@ -259,9 +261,11 @@ def upload_accounts():
         flash('አካውንቶች በተሳካ ሁኔታ ተጭነዋል!')
     return redirect(url_for('index'))
 
-@app.route('/upload_comments', methods=['POST'])
+@app.route('/upload_comments', methods=['GET', 'POST'])
 @login_required
 def upload_comments():
+    if request.method == 'GET':
+        return redirect(url_for('index'))
     if current_user.role == 'viewer':
         return redirect(url_for('index'))
     
@@ -282,9 +286,11 @@ def upload_comments():
         flash('ኮሜንቶች በተሳካ ሁኔታ ተጭነዋል!')
     return redirect(url_for('index'))
 
-@app.route('/add_link', methods=['POST'])
+@app.route('/add_link', methods=['GET', 'POST'])
 @login_required
 def add_link():
+    if request.method == 'GET':
+        return redirect(url_for('index'))
     if current_user.role == 'viewer':
         return redirect(url_for('index'))
     
